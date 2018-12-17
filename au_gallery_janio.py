@@ -100,7 +100,7 @@ for d in sheet1_data:
         index = csv_data.index(f[0])
         csv_data[index]['shipper_order_id'] += ', {}'.format(
             str(int(d['OrderId'])))
-        csv_data[index]['item_quantity'] += 1
+        csv_data[index]['item_quantity'] += int(d.get('Quantity'))
     else:
         obj = {
             'shipper_order_id': str(int(d.get('OrderId', 0))),
