@@ -54,17 +54,59 @@ sheet2_data = convert_to_dict(ws2, {
 postals = {int(d['OrderId']): d['Zip Code'] for d in sheet2_data}
 
 
-def find_duplicate(obj, data):
+def find_duplicate_consignee(obj, data, item=False):
     filtered = filter(
         lambda x: x['consignee_name'].lower() == obj['Customer Name'].lower()
         and x['consignee_number'] == obj['Phone']
-        and x['consignee_address'].lower() == obj['Address'].lower()
-        and x['item_desc'].lower() == obj['SKU Name'].lower(),
+        and x['consignee_address'].lower() == obj['Address'].lower(),
         data)
     try:
         return list(filtered)
     except:
         return []
+
+
+def find_duplicate_item(obj, data):
+    filtered = filter(
+        lambda x: x['item_desc'].lower() == obj['SKU Name'].lower(), data
+    )
+    try:
+        return list(filtered)
+    except:
+        return []
+
+
+def convert_to_janio_object(raw_obj, ids=False):
+    if not ids:
+        ids = str(int(raw_obj.get('OrderId', 0)))
+
+    obj = {
+        'shipper_order_id': ids,
+        'tracking_no': '',
+        'item_desc': raw_obj.get('SKU Name', ''),
+        'item_quantity': int(raw_obj.get('Quantity', 0)),
+        'item_product_id': '',
+        'item_sku': int(raw_obj.get('SKU Number', 0)),
+        'item_category': 'Lifestyle Products',
+        'item_price_value': raw_obj.get('PaySubtotal', ''),
+        'item_price_currency': 'IDR',
+        'consignee_name': raw_obj.get('Customer Name', ''),
+        'consignee_number': raw_obj.get('Phone', ''),
+        'consignee_address': raw_obj.get('Address', ''),
+        'consignee_postal': postals.get(raw_obj.get('OrderId', ''), ''),
+        'consignee_country': 'Indonesia',
+        'consignee_state': raw_obj.get('District', ''),
+        'consignee_city': raw_obj.get('City', ''),
+        'consignee_province': raw_obj.get('Province', ''),
+        'consignee_email': '',
+        'order_length': 50,
+        'order_width': 50,
+        'order_height': 2,
+        'order_weight': 1,
+        'payment_type': 'prepaid',
+        'cod_amt_to_collect': '',
+    }
+    return obj
 
 
 fields = [
@@ -95,39 +137,27 @@ fields = [
 ]
 csv_data = []
 for d in sheet1_data:
-    f = find_duplicate(d, csv_data)
-    if f:
-        index = csv_data.index(f[0])
-        csv_data[index]['shipper_order_id'] += ', {}'.format(
-            str(int(d['OrderId'])))
-        csv_data[index]['item_quantity'] += int(d.get('Quantity'))
+    duplicate_consignee = find_duplicate_consignee(d, csv_data)
+    if duplicate_consignee:
+        id = str(int(d.get('OrderId', 0)))
+        ids = set([i['shipper_order_id'] for i in duplicate_consignee])
+        ids = ', '.join(ids)
+        if id not in ids:
+            ids += ', {}'.format(id)
+            for i in duplicate_consignee:
+                index = csv_data.index(i)
+                csv_data[index]['shipper_order_id'] = ids
+
+        obj = convert_to_janio_object(d, ids=ids)
+
+        duplicate_item = find_duplicate_item(d, duplicate_consignee)
+        if duplicate_item:
+            index = csv_data.index(duplicate_item[0])
+            csv_data[index]['item_quantity'] += int(d.get('Quantity', 0))
+        else:
+            csv_data.append(obj)
     else:
-        obj = {
-            'shipper_order_id': str(int(d.get('OrderId', 0))),
-            'tracking_no': '',
-            'item_desc': d.get('SKU Name', ''),
-            'item_quantity': int(d.get('Quantity', 0)),
-            'item_product_id': '',
-            'item_sku': int(d.get('SKU Number', 0)),
-            'item_category': 'Lifestyle Products',
-            'item_price_value': d.get('PaySubtotal', ''),
-            'item_price_currency': 'IDR',
-            'consignee_name': d.get('Customer Name', ''),
-            'consignee_number': d.get('Phone', ''),
-            'consignee_address': d.get('Address', ''),
-            'consignee_postal': postals.get(d.get('OrderId', ''), ''),
-            'consignee_country': 'Indonesia',
-            'consignee_state': d.get('District', ''),
-            'consignee_city': d.get('City', ''),
-            'consignee_province': d.get('Province', ''),
-            'consignee_email': '',
-            'order_length': 50,
-            'order_width': 50,
-            'order_height': 2,
-            'order_weight': 1,
-            'payment_type': 'prepaid',
-            'cod_amt_to_collect': '',
-        }
+        obj = convert_to_janio_object(d)
         csv_data.append(obj)
 
 
